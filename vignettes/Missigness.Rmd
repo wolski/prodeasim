@@ -1,0 +1,160 @@
+---
+title: "Testing Missigness distribution"
+output: html_document
+date: "2023-12-14"
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+```
+
+# Testing if missigness is random using Hypergeometric distribution
+
+Test if missing values are distributed randomly among two groups using 
+
+Probability of observing 0-8 intensities in a condition of 8 samples,
+- when 8 non-missing values were observed in all 16 samples - black line
+- when 9 non-missing values were observed in 16 samples - red line
+- If 7 non-missing values were observed in 16 samples - green line
+
+
+```{r}
+m <- 8
+n <- 16 - 8
+k <- 8
+plot(0:20 , dhyper(0:20,m,n,k), type = 'l')
+k <- 9
+lines(0:20 , dhyper(0:20,m,n,k), type = 'l', col = 2)
+k <- 7
+lines(0:20 , dhyper(0:20,m,n,k), type = 'l', col = 3)
+
+k <- 4
+lines(0:20 , dhyper(0:20,m,n,k), type = 'l', col = "pink")
+
+
+```
+
+
+```{r}
+m <- 8
+n <- 16-8
+
+plot(0:8 , phyper(0:8,m,n,8), type = 'l')
+lines(0:8 , phyper(0:8,m,n,9), type = 'l', col = 2)
+lines(0:8 , phyper(0:8,m,n,7), type = 'l', col = 3)
+lines(0:8 , phyper(0:8,m,n,0), type = 'l', col = 3)
+
+```
+
+```{r}
+
+testDistributionOfPresent <- function(observedA ,observedB, samplesA, samplesB  ){
+ totalObserved = observedA + observedB
+ nrA <- ifelse(observedA <= observedB, observedA, observedB)
+ res <- phyper(nrA, samplesA, samplesB, totalObserved)
+ return(res)
+}
+
+testDistributionOfPresent(2,2,8,8)
+testDistributionOfPresent(4,4,8,8)
+testDistributionOfPresent(1,1,8,8)
+testDistributionOfPresent(7,7,8,8)
+testDistributionOfPresent(7,7,21,30)
+testDistributionOfPresent(10,10,21,30)
+testDistributionOfPresent(2,20,21,30)
+
+```
+
+Simulate
+
+```{r}
+condA <- 8
+condB <- 8
+observedA <- sample(0:8, 20000, replace = TRUE)
+observedB <- sample(0:8, 20000, replace = TRUE)
+xb <- data.frame(observedA = observedA, observedB = observedB, condA = 8, condB = 8)
+
+xb$condA <- 8
+xb$condB <- 8
+xb$pvals <- testDistributionOfPresent(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$condA, samplesB = xb$condB)
+
+```
+
+
+
+
+# Odds Ratio
+
+$$
+\begin{array}{|r|cc|}
+\hline
+& {\text { Diseased }} & {\text { Healthy }} \\
+\hline
+\text { Exposed } & 20 & 380 \\
+\text { Not exposed } & 6 & 594 \\
+\hline
+\end{array}
+$$
+
+
+$$ \text{Relative risk} = \frac{D_E/(D_E + H_E)}{D_N/(D_N + H_N)}= \frac{D_E/V_E}{D_N/V_N}= \frac{20/400}{6/600}= \frac{.05}{.01} = 5\,.$$
+The odds ratio is different.  The ''odds'' of getting the disease if exposed is $$D_E/H_E=20/380\approx .052 ,$$and the odds if not exposed is  $$D_N/H_N = 6/594 \approx .010 \,.$$ The odds ratio is the ratio of the two,
+
+$$\text{Odds ratio} = \frac{D_E/H_E}{D_N/H_N}=   \frac{20/380}{6/594}\approx   \frac{.052}{.010} = 5.2\,.$$
+
+
+```{r}
+relativeRisk <- function(observedA, observedB, samplesA, samplesB) {
+   rr <- (observedA/(observedA + observedB))/(samplesA/(samplesA+samplesB))
+   return(rr)
+}
+xb$rr <- relativeRisk(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$condA, samplesB = xb$condB)
+
+odsRatio <- function(observedA, observedB, samplesA, samplesB) {
+   rr <- (observedA/observedB)/(samplesA/samplesB)
+   return(rr)
+}
+
+xb$or <- odsRatio(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$condA, samplesB = xb$condB)
+hist(xb$or, breaks = 100)
+abline(v = 1, col = 2)
+hist(log(xb$or))
+```
+
+Ein Volcano darf auch nicht fehlen
+
+```{r}
+plot(log(xb$or), -log10(xb$pvals))
+
+xb$logor <- log(xb$or)
+
+library(tidyverse)
+xc <- xb |> filter(logor < 0.01, logor > -0.01)
+plot(xc$observedA, xc$pvals)
+plot(xc$observedB, xc$pvals)
+plot(xc$observedA, xc$observedB)
+
+```
+
+
+
+
+
+
+
+# compare with fishers test
+
+```{r}
+TeaTasting <- matrix(c(1, 2, 3, 4),
+       nrow = 2,
+       dimnames = list(Guess = c("A", "B"),
+                       Truth = c("A", "B")))
+TeaTasting
+fisher.test(TeaTasting, alternative = "greater")
+```
