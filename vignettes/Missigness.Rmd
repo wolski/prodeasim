@@ -24,41 +24,14 @@ Probability of observing 0-8 intensities in a condition of 8 samples,
 - If 7 non-missing values were observed in 16 samples - green line
 
 
-```{r}
-m <- 8
-n <- 16 - 8
-k <- 8
-plot(0:20 , dhyper(0:20,m,n,k), type = 'l')
-k <- 9
-lines(0:20 , dhyper(0:20,m,n,k), type = 'l', col = 2)
-k <- 7
-lines(0:20 , dhyper(0:20,m,n,k), type = 'l', col = 3)
-
-k <- 4
-lines(0:20 , dhyper(0:20,m,n,k), type = 'l', col = "pink")
-
-
-```
-
-
-```{r}
-m <- 8
-n <- 16-8
-
-plot(0:8 , phyper(0:8,m,n,8), type = 'l')
-lines(0:8 , phyper(0:8,m,n,9), type = 'l', col = 2)
-lines(0:8 , phyper(0:8,m,n,7), type = 'l', col = 3)
-lines(0:8 , phyper(0:8,m,n,0), type = 'l', col = 3)
-
-```
 
 ```{r}
 
 testDistributionOfPresent <- function(observedA ,observedB, samplesA, samplesB  ){
- totalObserved = observedA + observedB
- nrA <- ifelse(observedA <= observedB, observedA, observedB)
- res <- phyper(nrA, samplesA, samplesB, totalObserved)
- return(res)
+   totalObserved = observedA + observedB
+   nrA <- ifelse(observedA <= observedB, observedA, observedB)
+   res <- phyper(nrA, samplesA, samplesB, totalObserved)
+   return(res)
 }
 
 testDistributionOfPresent(2,2,8,8)
@@ -71,18 +44,30 @@ testDistributionOfPresent(2,20,21,30)
 
 ```
 
-Simulate
+Simulate dataset
 
 ```{r}
+Nprot <- 1000
 condA <- 8
 condB <- 8
-observedA <- sample(0:8, 20000, replace = TRUE)
-observedB <- sample(0:8, 20000, replace = TRUE)
-xb <- data.frame(observedA = observedA, observedB = observedB, condA = 8, condB = 8)
+observedA <- sample(0:8, Nprot, replace = TRUE)
+observedB <- sample(0:8, Nprot, replace = TRUE)
+xb <- data.frame(observedA = observedA, observedB = observedB)
 
-xb$condA <- 8
-xb$condB <- 8
-xb$pvals <- testDistributionOfPresent(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$condA, samplesB = xb$condB)
+xb$samplesA <- condA
+xb$samplesB <- condB
+proteinID <- unique(stringi::stri_rand_strings(Nprot + 20,5))[1:Nprot]
+xb$proteinID <- proteinID
+xlater <- xb
+```
+
+
+```{r}
+xb$pvals <- testDistributionOfPresent(
+   observedA = xb$observedA,
+   observedB = xb$observedB,
+   samplesA = xb$samplesA,
+   samplesB = xb$samplesB)
 
 ```
 
@@ -114,47 +99,111 @@ relativeRisk <- function(observedA, observedB, samplesA, samplesB) {
    rr <- (observedA/(observedA + observedB))/(samplesA/(samplesA+samplesB))
    return(rr)
 }
-xb$rr <- relativeRisk(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$condA, samplesB = xb$condB)
+xb$rr <- relativeRisk(observedA = xb$observedA,
+                      observedB = xb$observedB,
+                      samplesA = xb$samplesA, samplesB = xb$samplesB)
 
 odsRatio <- function(observedA, observedB, samplesA, samplesB) {
    rr <- (observedA/observedB)/(samplesA/samplesB)
    return(rr)
 }
 
-xb$or <- odsRatio(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$condA, samplesB = xb$condB)
+xb$or <- odsRatio(observedA = xb$observedA, observedB = xb$observedB, samplesA = xb$samplesA, samplesB = xb$samplesB)
 hist(xb$or, breaks = 100)
 abline(v = 1, col = 2)
 hist(log(xb$or))
+
 ```
 
-Ein Volcano darf auch nicht fehlen
+Volcano is also needed:
 
 ```{r}
-plot(log(xb$or), -log10(xb$pvals))
-
-xb$logor <- log(xb$or)
-
-library(tidyverse)
-xc <- xb |> filter(logor < 0.01, logor > -0.01)
-plot(xc$observedA, xc$pvals)
-plot(xc$observedB, xc$pvals)
-plot(xc$observedA, xc$observedB)
+plot(log2(xb$or), -log10(xb$pvals))
 
 ```
-
-
-
-
 
 
 
 # compare with fishers test
 
 ```{r}
-TeaTasting <- matrix(c(1, 2, 3, 4),
-       nrow = 2,
-       dimnames = list(Guess = c("A", "B"),
-                       Truth = c("A", "B")))
-TeaTasting
-fisher.test(TeaTasting, alternative = "greater")
+# Define your data
+group_A <- c(1, 1, 0, 0, 0)
+group_B <- c(1, 1, 1, 1, 1)
+
+group_A <- c(1, 1, 1, 1, 1)
+group_B <- c(1, 1, 1, 1, 1)
+
+group_A <- c(1, 1, 0,0,0)
+group_B <- c(1, 1, 0,0,0)
+
+# Perform Fisher's exact test
+fisher_result <- fisher.test(
+   matrix(c(sum(group_A == 1), sum(group_A == 0), 
+            sum(group_B == 1), sum(group_B == 0)), nrow = 2))
+
+
+
+```
+
+# collect all the steps in a function
+
+```{r}
+
+computeForMissing <- function(xb,
+                              observedA = "observedA",
+                              observedB = "observedB",
+                              samplesA = "samplesA",
+                              samplesB = "samplesB"
+) {
+   relativeRisk <- function(observedA, observedB, samplesA, samplesB) {
+      rr <- (observedA/(observedA + observedB))/(samplesA/(samplesA + samplesB))
+      return(rr)
+   }
+   odsRatio <- function(observedA, observedB, samplesA, samplesB) {
+      rr <- (observedA/observedB)/(samplesA/samplesB)
+      return(rr)
+   }
+   apply_fischer <- function(proteinID,observedA, observedB, samplesA, samplesB){
+      mat <- matrix(c(observedA, samplesA - observedA, 
+                      observedB,samplesB - observedB), nrow = 2)
+      fisher_result <- fisher.test(mat)
+      return(data.frame(proteinID =  proteinID,
+                        p_value = fisher_result$p.value,
+                        OdsRatio = (fisher_result$estimate),
+                        conf.lower = (fisher_result$conf.int[1]),
+                        conf.higher = (fisher_result$conf.int[2]))
+      )
+   }
+   
+   xb$OdsRatioM <- odsRatio(
+      observedA = xb[["observedA"]],
+      observedB = xb[["observedB"]],
+      samplesA = xb[["samplesA"]],
+      samplesB = xb[["samplesB"]])
+   xb$relativeRiskM <- relativeRisk(
+      observedA = xb[["observedA"]],
+      observedB = xb[["observedB"]],
+      samplesA = xb[["samplesA"]],
+      samplesB = xb[["samplesB"]])
+   
+   res <- vector(mode = "list", length(nrow(xb)))
+   
+   for (i in seq(nrow(xb))) {
+      res[[i]] <- apply_fischer(
+         xb[["proteinID"]][i],
+         xb[["observedA"]][i],
+         xb[["observedB"]][i],
+         xb[["samplesA"]][i],
+         xb[["samplesB"]][i] )
+   }
+   
+   result <- dplyr::bind_rows(res)
+   xx <- dplyr::inner_join(xb , result, by = c("proteinID" = "proteinID"))
+   return(xx)
+}
+
+res <- computeForMissing(xlater)
+plot(log2(res$OdsRatioM), -log10(res$p_value))
+
 ```
