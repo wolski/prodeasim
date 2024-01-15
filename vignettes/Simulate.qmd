@@ -27,83 +27,11 @@ For peptides:
   $$FC_{pep} \sim N(FC_{pro}, \sigma_{FC_{P}})$$
 - Let's assume that the abundance of the peptide does on depend on protein abundance. The distribution of peptide intensities is $I_{pep} \sim LogNormal(\mu,\sigma) $
 
-- From this we will derive the abundances 
-
-Generate protein IDS
 
 ```{r}
-Nprot <- 1000
-# this generates protein ID's
-proteins <- stringi::stri_rand_strings(Nprot,5)
-
+peptideAbundances <- sim_data()
 ```
 
-Simulate number of pepeptides per proteins using the geometric distribution
-
-```{r}
-probability_of_success <- 0.3
-nrpeptides <- rgeom(n = Nprot, probability_of_success) + 1
-plot(table(nrpeptides))
-```
-
-```{r}
-
-fc <- c(D = -2, N = 0, U = 2)
-prop <- c(D = 10, N = 80, U = 10)
-
-prot <- data.frame(
-  proteinID = proteins,
-  nrPeptides = nrpeptides,
-  FC = rep(fc, prop / 100 * Nprot),
-  DE = rep(names(fc), prop / 100 * Nprot),
-  sd = rep(1, Nprot),
-  AvgAbd = rlnorm(Nprot,log(20),20/100)
-)
-prot <- prot |> tidyr::unite("proteinID", proteinID, DE)
-
-```
-
-Add fold change to the mean of group A.
-
-```{r}
-prot <- prot |> dplyr::mutate(mean_A = 0 + FC, N_A = 4, mean_B = 0, N_B = 4)
-```
-
-```{r}
-result_df <- prot |> uncount(nrPeptides)
-result_df$peptideID <- stringi::stri_rand_strings(sum(prot$nrPeptides),8)
-head(result_df)
-```
-
-```{r}
-foo
-res2 <- result_df |> pivot_longer(cols = starts_with(c("mean", "N_")),names_to = "group" , values_to = "mean")
-res2 <-  res2 |> tidyr::separate(group, c("what", "group"))
-res2 <- res2 |> pivot_wider(names_from = "what", values_from = mean)
-head(res2)
-
-```
-
-Now sample peptide intensities
-
-```{r}
-
-sample_from_normal <- function(mean, sd, n) {
-  rnorm(n, mean, sd)
-}
-
-
-sampled_data <- mapply(sample_from_normal, res2$mean, res2$sd, res2$N)
-sampled_data <- as.data.frame(t(sampled_data))
-
-x <- bind_cols(res2,sampled_data)
-
-peptideAbudances <- x |> pivot_longer(starts_with("V"), names_to = "Replicate", values_to = "abundance")
-peptideAbudances$abundance = peptideAbudances$AvgAbd + peptideAbudances$abundance
-peptideAbudances$abundance |> hist()
-peptideAbundances <- peptideAbudances |> tidyr::unite("sample", group, Replicate, remove =  FALSE)
-
-```
 
 # Analyse simulated data with prolfqua
 
@@ -160,7 +88,7 @@ aovtable <- mod$get_anova()
 
 
 head(aovtable)
-xx <- aovtable |> dplyr::filter(FDR.Pr..F. < 0.5)
+xx <- aovtable |> dplyr::filter(FDR < 0.5)
 signif <- lfqdata$get_copy()
 signif$data <- signif$data |> dplyr::filter(protein_Id %in% xx$protein_Id)
 hmSig <- signif$get_Plotter()$heatmap()

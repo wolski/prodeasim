@@ -59,6 +59,7 @@ xb$samplesB <- condB
 proteinID <- unique(stringi::stri_rand_strings(Nprot + 20,5))[1:Nprot]
 xb$proteinID <- proteinID
 xlater <- xb
+
 ```
 
 
@@ -130,6 +131,14 @@ plot(log2(xb$or), -log10(xb$pvals))
 # Define your data
 group_A <- c(1, 1, 0, 0, 0)
 group_B <- c(1, 1, 1, 1, 1)
+dataf <- data.frame(factor = c(rep("A",5),rep("B",5)), resp = c(group_A, group_B))
+dataf
+x <- (glm(data=dataf, resp ~ factor, family = binomial()))
+x
+fisher_result <- fisher.test(
+   matrix(c(sum(group_A == 1), sum(group_A == 0), 
+            sum(group_B == 1), sum(group_B == 0)), nrow = 2))
+fisher_result$p.value
 
 group_A <- c(1, 1, 1, 1, 1)
 group_B <- c(1, 1, 1, 1, 1)
@@ -141,8 +150,9 @@ group_B <- c(1, 1, 0,0,0)
 fisher_result <- fisher.test(
    matrix(c(sum(group_A == 1), sum(group_A == 0), 
             sum(group_B == 1), sum(group_B == 0)), nrow = 2))
-
-
+fisher_result$p.value
+dataf <- data.frame(factor = c(rep("A",5),rep("B",5)), resp = c(group_A, group_B))
+summary(glm(data=dataf, resp ~ factor, family = binomial()))
 
 ```
 
@@ -150,7 +160,7 @@ fisher_result <- fisher.test(
 
 ```{r}
 
-computeForMissing <- function(xb,
+contrasts_fisher_exact <- function(xb,
                               observedA = "observedA",
                               observedB = "observedB",
                               samplesA = "samplesA",
@@ -203,7 +213,7 @@ computeForMissing <- function(xb,
    return(xx)
 }
 
-res <- computeForMissing(xlater)
+res <- contrasts_fisher_exact(xlater)
 plot(log2(res$OdsRatioM), -log10(res$p_value))
 
 ```
